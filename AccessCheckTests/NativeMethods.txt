@@ -1,0 +1,5 @@
+AccessCheck
+DuplicateToken
+FILE_ACCESS_RIGHTS
+GetCurrentProcess
+OpenProcessToken

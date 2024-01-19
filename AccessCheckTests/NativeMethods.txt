@@ -3,3 +3,4 @@ DuplicateToken
 FILE_ACCESS_RIGHTS
 GetCurrentProcess
 OpenProcessToken
+WIN32_ERROR

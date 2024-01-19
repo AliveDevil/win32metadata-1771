@@ -2,6 +2,7 @@ using Microsoft.Win32.SafeHandles;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Principal;
+using Windows.Win32.Foundation;
 using Windows.Win32.Security;
 
 namespace AccessCheckTests;
@@ -39,21 +40,6 @@ public unsafe class AccessCheckTest
 	}
 
 	[TestMethod]
-	public void PassNullNull()
-	{
-		bool result;
-		fixed (byte* securityBufferLocal = securityBuffer)
-		{
-			GENERIC_MAPPING mapping = default;
-			PSECURITY_DESCRIPTOR descriptor = (PSECURITY_DESCRIPTOR)securityBufferLocal;
-			result = AccessCheck(descriptor, handle, (uint)FILE_GENERIC_READ, mapping, null, ref NullRef<uint>(), out var granted, out var access);
-			var lastError = Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error());
-			Assert.IsTrue(result, "Erroneous false returned, granted: {0:X}, access: {1}. Last Error: {2}", granted, access, lastError);
-			Assert.IsTrue(access, "Access not granted, {0:X}. Last Error: {1}", granted, lastError);
-		}
-	}
-
-	[TestMethod]
 	public void PassNullZero()
 	{
 		bool result;
@@ -63,10 +49,11 @@ public unsafe class AccessCheckTest
 			PSECURITY_DESCRIPTOR descriptor = (PSECURITY_DESCRIPTOR)securityBufferLocal;
 			uint length = 0;
 			result = AccessCheck(descriptor, handle, (uint)FILE_GENERIC_READ, mapping, null, ref length, out var granted, out var access);
-			var lastError = Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error());
-			Assert.IsTrue(result, "Erroneous false returned, granted: {0:X}, access: {1}. Last Error: {2}", granted, access, lastError);
-			Assert.IsTrue(access, "Access not granted, {0:X}. Last Error: {1}", granted, lastError);
-		}
+
+            // API detects length is too small, writes out new length, and returns error
+            Assert.IsTrue(length == 20);
+            Assert.IsTrue(Marshal.GetLastWin32Error() == (int)WIN32_ERROR.ERROR_INSUFFICIENT_BUFFER);
+        }
 	}
 
 	[TestMethod]
@@ -79,10 +66,11 @@ public unsafe class AccessCheckTest
 			PSECURITY_DESCRIPTOR descriptor = (PSECURITY_DESCRIPTOR)securityBufferLocal;
 			uint length = (uint)SizeOf<PRIVILEGE_SET>();
 			result = AccessCheck(descriptor, handle, (uint)FILE_GENERIC_READ, mapping, null, ref length, out var granted, out var access);
-			var lastError = Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error());
-			Assert.IsTrue(result, "Erroneous false returned, granted: {0:X}, access: {1}. Last Error: {2}", granted, access, lastError);
-			Assert.IsTrue(access, "Access not granted, {0:X}. Last Error: {1}", granted, lastError);
-		}
+
+            // API uses the 20-byte structure at 0x00 and fails with ERROR_NOACCESS
+            Assert.IsTrue(length == 20);
+            Assert.IsTrue(Marshal.GetLastWin32Error() == 998);
+        }
 	}
 
 	[TestMethod]
@@ -97,9 +85,11 @@ public unsafe class AccessCheckTest
 			uint length = 0;
 			result = AccessCheck(descriptor, handle, (uint)FILE_GENERIC_READ, mapping, &set, ref length, out var granted, out var access);
 			var lastError = Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error());
-			Assert.IsTrue(result, "Erroneous false returned, granted: {0:X}, access: {1}. Last Error: {2}", granted, access, lastError);
-			Assert.IsTrue(access, "Access not granted, {0:X}. Last Error: {1}", granted, lastError);
-		}
+
+            // API detects length is too small, writes out new length, and returns error
+            Assert.IsTrue(length == 20);
+            Assert.IsTrue(Marshal.GetLastWin32Error() == (int)WIN32_ERROR.ERROR_INSUFFICIENT_BUFFER);
+        }
 	}
 
 	[TestMethod]
@@ -114,8 +104,10 @@ public unsafe class AccessCheckTest
 			uint length = (uint)SizeOf<PRIVILEGE_SET>();
 			result = AccessCheck(descriptor, handle, (uint)FILE_GENERIC_READ, mapping, &set, ref length, out var granted, out var access);
 			var lastError = Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error());
-			Assert.IsTrue(result, "Erroneous false returned, granted: {0:X}, access: {1}. Last Error: {2}", granted, access, lastError);
-			Assert.IsTrue(access, "Access not granted, {0:X}. Last Error: {1}", granted, lastError);
-		}
+
+            // API uses the 20-byte structure at &set and succeeds
+            Assert.IsTrue(length == 20);
+            Assert.IsTrue(Marshal.GetLastWin32Error() == 0);
+        }
 	}
 }
